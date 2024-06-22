@@ -8,7 +8,7 @@ import os
 import signal
 from datetime import datetime, timezone
 
-# API Keys and Secrets
+# API 密钥和密钥
 OKX_API_KEY = ''
 OKX_API_SECRET = ''
 OKX_API_PASS = ''
@@ -17,7 +17,7 @@ BITGET_API_KEY = ''
 BITGET_API_SECRET = ''
 BITGET_API_PASS = ''
 
-# API URLs
+# API URL
 OKX_BASE_URL = 'https://www.okx.com'
 OKX_POSITION_ENDPOINT = '/api/v5/account/positions'
 OKX_BALANCE_ENDPOINT = '/api/v5/account/balance'
@@ -57,7 +57,7 @@ def get_okx_positions():
     if response.status_code == 200:
         return response.json()
     else:
-        print(f"Error fetching OKX positions: {response.status_code}")
+        print(f"获取 OKX 仓位出错: {response.status_code}")
         print(response.text)
         return None
 
@@ -76,7 +76,7 @@ def get_okx_balance():
     if response.status_code == 200:
         return response.json()
     else:
-        print(f"Error fetching OKX balance: {response.status_code}")
+        print(f"获取 OKX 余额出错: {response.status_code}")
         print(response.text)
         return None
 
@@ -96,7 +96,7 @@ def get_bitget_balance():
     if response.status_code == 200:
         return response.json()
     else:
-        print(f"Error fetching Bitget balance: {response.status_code}")
+        print(f"获取 Bitget 余额出错: {response.status_code}")
         print(response.text)
         return None
 
@@ -123,8 +123,8 @@ def convert_okx_to_bitget_position(okx_position, action='open', quantity_ratio=1
         "quantity": str(float(okx_position["pos"]) * quantity_ratio),
         "orderType": "market",
         "marginMode": "cross",
-        "price": "",  # Market order doesn't require price
-        "clientOrderId": "",  # Optional, can be used for tracking orders
+        "price": "",  # 市价单不需要价格
+        "clientOrderId": "",  # 可选，可以用于跟踪订单
         "reduceOnly": action == 'close'
     }
     return bitget_position
@@ -142,36 +142,36 @@ def place_bitget_order(bitget_position):
     response = requests.post(BITGET_BASE_URL + BITGET_ORDER_ENDPOINT, headers=headers, data=json.dumps(bitget_position))
     
     if response.status_code == 200:
-        print("Order placed successfully on Bitget")
+        print("成功在 Bitget 下单")
     else:
-        print(f"Error placing order on Bitget: {response.status_code}")
+        print(f"在 Bitget 下单出错: {response.status_code}")
         print(response.text)
 
 def compare_and_sync_positions(prev_positions, current_positions, quantity_ratio):
     prev_positions_dict = {pos['instId']: pos for pos in prev_positions['data']}
     current_positions_dict = {pos['instId']: pos for pos in current_positions['data']}
     
-    # Check for new or increased positions
+    # 检查新建或增加的仓位
     for instId, current_pos in current_positions_dict.items():
         prev_pos = prev_positions_dict.get(instId)
         if not prev_pos:
-            # New position
+            # 新建仓位
             bitget_position = convert_okx_to_bitget_position(current_pos, action='open', quantity_ratio=quantity_ratio)
             place_bitget_order(bitget_position)
         elif float(current_pos['pos']) > float(prev_pos['pos']):
-            # Increased position
+            # 增加仓位
             bitget_position = convert_okx_to_bitget_position(current_pos, action='open', quantity_ratio=quantity_ratio)
             place_bitget_order(bitget_position)
     
-    # Check for decreased or closed positions
+    # 检查减少或关闭的仓位
     for instId, prev_pos in prev_positions_dict.items():
         current_pos = current_positions_dict.get(instId)
         if not current_pos:
-            # Closed position
+            # 关闭仓位
             bitget_position = convert_okx_to_bitget_position(prev_pos, action='close', quantity_ratio=quantity_ratio)
             place_bitget_order(bitget_position)
         elif float(current_pos['pos']) < float(prev_pos['pos']):
-            # Decreased position
+            # 减少仓位
             bitget_position = convert_okx_to_bitget_position(prev_pos, action='close', quantity_ratio=quantity_ratio)
             bitget_position['quantity'] = str(float(prev_pos['pos']) - float(current_pos['pos']) * quantity_ratio)
             place_bitget_order(bitget_position)
@@ -187,23 +187,24 @@ def sync_positions():
         okx_equity = float(okx_balance['data'][0]['details'][0]['eq'])
         bitget_equity = float(bitget_balance['data'][0]['usdtEquity'])
         quantity_ratio = bitget_equity / okx_equity if okx_equity != 0 else 1.0
-        print(f"Quantity ratio: {quantity_ratio}")
+        print(f"数量比例: {quantity_ratio}")
 
         if current_positions:
             save_positions_to_json(current_positions)
             compare_and_sync_positions(prev_positions, current_positions, quantity_ratio)
 
 def signal_handler(sig, frame):
-    print('\nProgram interrupted. Exiting gracefully...')
+    print('\n程序被中断。正在优雅退出...')
     exit(0)
 
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     
-    try:
-        while True:
+    while True:
+        try:
             sync_positions()
-            time.sleep(3)  # Check every 3 seconds
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        exit(1)
+            time.sleep(3)  # 每3秒检查一次
+        except Exception as e:
+            print(f"发生错误: {e}")
+            time.sleep(5)  # 出现异常时等待5秒后重试
+            continue
