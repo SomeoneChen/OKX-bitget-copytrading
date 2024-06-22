@@ -1,3 +1,4 @@
+#coding=utf-8
 import requests
 import json
 import time
@@ -194,7 +195,7 @@ def sync_positions():
             compare_and_sync_positions(prev_positions, current_positions, quantity_ratio)
 
 def signal_handler(sig, frame):
-    print('\n程序被中断。正在优雅退出...')
+    print('\n程序被中断。正在正常退出...')
     exit(0)
 
 if __name__ == "__main__":
